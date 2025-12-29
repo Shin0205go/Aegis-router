@@ -595,6 +595,12 @@ IMPORTANT: With great power comes great responsibility.
    * Check if a tool is allowed for a role
    */
   isToolAllowedForRole(roleId: string, toolName: string, serverName: string): boolean {
+    // System tools are always allowed regardless of role
+    const SYSTEM_TOOLS = ['get_agent_manifest'];
+    if (SYSTEM_TOOLS.includes(toolName)) {
+      return true;
+    }
+
     const role = this.roles.get(roleId);
     if (!role) return false;
 
