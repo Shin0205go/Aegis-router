@@ -10,10 +10,7 @@
     },
     "gemini-file-search": {
       "command": "node",
-      "args": ["/Users/shingo/Develop/gemini-file-search-demo/dist/mcp-server.js"],
-      "env": {
-        "GEMINI_API_KEY": "AIzaSyDdrHu3jumfwd7_Bl1H0FmyfDcFr6L4rjc"
-      }
+      "args": ["/Users/shingo/Develop/gemini-file-search-demo/dist/mcp-server.js"]
     },
     "history-mcp": {
       "command": "node",
