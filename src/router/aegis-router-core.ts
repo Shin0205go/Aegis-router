@@ -371,6 +371,11 @@ export class AegisRouterCore extends EventEmitter {
     const previousVisibleTools = new Set(this.state.visibleTools.keys());
     this.state.visibleTools.clear();
 
+    const currentRoleId = this.state.currentRole?.id || 'none';
+    const allowedServers = this.state.currentRole?.allowedServers || [];
+    this.logger.info(`🔍 Filtering tools for role: ${currentRoleId}, allowedServers: ${JSON.stringify(allowedServers)}`);
+
+    let filtered = 0;
     for (const [name, toolInfo] of this.allTools) {
       const isVisible = this.isToolVisibleForRole(toolInfo);
 
@@ -381,8 +386,11 @@ export class AegisRouterCore extends EventEmitter {
       } else {
         toolInfo.visible = false;
         toolInfo.visibilityReason = 'role_restricted';
+        filtered++;
       }
     }
+
+    this.logger.info(`🔍 Filtered out ${filtered} tools, ${this.state.visibleTools.size} visible`);
 
     // Always add the get_agent_manifest tool
     this.addManifestTool();
@@ -831,6 +839,23 @@ export class AegisRouterCore extends EventEmitter {
   private getFilteredToolsList(): any {
     const tools: Tool[] = [];
 
+    // Always include get_agent_manifest (system tool)
+    tools.push({
+      name: 'get_agent_manifest',
+      description: 'Switch to a specific role and get the system instruction and available tools for that role. Use "list" to see available roles.',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          role_id: {
+            type: 'string',
+            description: 'The role ID to switch to. Use "list" to see available roles.'
+          }
+        },
+        required: ['role_id']
+      }
+    });
+
+    // Add visible tools for current role
     for (const [_, toolInfo] of this.state.visibleTools) {
       tools.push(toolInfo.tool);
     }

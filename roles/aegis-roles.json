@@ -1,6 +1,6 @@
 {
   "version": "2.0.0",
-  "defaultRole": "default",
+  "defaultRole": "orchestrator",
   "serverGroups": {
     "filesystem": ["filesystem"],
     "execution": ["execution-server"],
@@ -39,15 +39,18 @@
   ],
   "roles": [
     {
-      "id": "default",
-      "name": "Default Role",
-      "description": "Full access to all servers and tools for unrestricted operation",
-      "allowedServers": ["*"],
-      "systemInstruction": "You have full access to all available tools and servers. Use them responsibly and follow best practices for security and data handling.",
+      "id": "orchestrator",
+      "name": "Orchestrator",
+      "description": "Orchestrator role that delegates tasks to specialized sub-agents",
+      "allowedServers": [],
+      "toolPermissions": {
+        "denyPatterns": ["*"]
+      },
+      "systemInstruction": "あなたはオーケストレーターです。直接タスクを実行するツールは持っていません。\n\nタスクを実行するには、専門のサブエージェントに委譲してください：\n\n1. `get_agent_manifest` で利用可能なロール一覧を確認\n2. `spawn_sub_agent` でサブエージェントを起動してタスクを委譲\n\n利用可能なロール例：\n- mentor: コードの指導・教育\n- frontend: フロントエンド開発\n- backend: バックエンド開発\n- security: セキュリティ分析\n- devops: インフラ・デプロイ\n\nユーザーのリクエストに応じて、適切なロールのサブエージェントを起動してください。",
       "metadata": {
         "priority": 0,
         "active": true,
-        "tags": ["default", "full-access"]
+        "tags": ["orchestrator", "delegation"]
       }
     },
     {
