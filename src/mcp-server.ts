@@ -99,7 +99,9 @@ async function main() {
     let backendTools: any[] = [];
     try {
       const response = await routerCore.routeRequest({ method: 'tools/list' });
-      backendTools = response?.result?.tools || response?.tools || [];
+      const rawTools = response?.result?.tools || response?.tools || [];
+      // Filter out get_agent_manifest from backend to avoid duplicates
+      backendTools = rawTools.filter((t: any) => t.name !== 'get_agent_manifest');
       logger.info(`Got ${backendTools.length} tools from backend servers`);
     } catch (error) {
       logger.warn('Failed to get tools from backend servers:', error);

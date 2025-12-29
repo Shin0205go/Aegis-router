@@ -430,9 +430,9 @@ export class AegisRouterCore extends EventEmitter {
       inputSchema: {
         type: 'object' as const,
         properties: {
-          role: {
+          role_id: {
             type: 'string',
-            description: 'The role ID to activate (e.g., "frontend", "db_admin", "security")'
+            description: 'The role ID to switch to. Use "list" to see available roles.'
           },
           includeToolDescriptions: {
             type: 'boolean',
@@ -440,7 +440,7 @@ export class AegisRouterCore extends EventEmitter {
             default: true
           }
         },
-        required: ['role']
+        required: ['role_id']
       }
     };
 
@@ -781,7 +781,7 @@ export class AegisRouterCore extends EventEmitter {
   private async handleGetAgentManifest(args: Record<string, any>): Promise<any> {
     try {
       const manifest = await this.getAgentManifest({
-        role: args.role,
+        role: args.role_id,
         includeToolDescriptions: args.includeToolDescriptions !== false
       });
 

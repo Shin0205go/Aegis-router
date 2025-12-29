@@ -136,7 +136,7 @@ export class RouterAdapter {
   }> {
     try {
       const manifest = await this.routerCore.getAgentManifest({
-        role: args.role,
+        role: args.role_id,
         includeToolDescriptions: args.includeToolDescriptions !== false
       });
 
