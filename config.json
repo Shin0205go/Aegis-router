@@ -1,0 +1,38 @@
+{
+  "mcpServers": {
+    "agent-skills": {
+      "command": "node",
+      "args": ["/Users/shingo/Develop/agent-skills-server/index.js", "/Users/shingo/.skills"]
+    },
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/Users/shingo"]
+    },
+    "gemini-file-search": {
+      "command": "node",
+      "args": ["/Users/shingo/Develop/gemini-file-search-demo/dist/mcp-server.js"],
+      "env": {
+        "GEMINI_API_KEY": "AIzaSyDdrHu3jumfwd7_Bl1H0FmyfDcFr6L4rjc"
+      }
+    },
+    "history-mcp": {
+      "command": "node",
+      "args": ["/Users/shingo/Develop/history-mcp/dist/index.js"]
+    },
+    "playwright": {
+      "command": "npx",
+      "args": ["@playwright/mcp@latest"]
+    },
+    "gemini-cli": {
+      "command": "node",
+      "args": ["/Users/shingo/Develop/gemini-cli-mcp/dist/index.js"]
+    },
+    "task-monitor": {
+      "command": "node",
+      "args": ["/Users/shingo/Develop/universal-task-monitor-mcp/dist/index.js"]
+    }
+  },
+  "roles": {
+    "defaultRole": "default"
+  }
+}
