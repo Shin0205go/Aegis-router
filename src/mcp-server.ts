@@ -415,15 +415,16 @@ async function main() {
         logger.info(`Switching to role: ${roleId}, starting required servers...`);
         await routerCore.startServersForRole(roleId);
 
-        // Notify client that tools have changed
+        // Get manifest (this updates currentRole and visibleTools)
+        const manifest = await routerCore.getAgentManifest({ role: roleId });
+
+        // Notify client that tools have changed AFTER role is updated
         try {
           await server.sendToolListChanged();
           logger.info('Sent tools/list_changed notification');
         } catch (notifyError) {
           logger.warn('Failed to send tools/list_changed notification:', notifyError);
         }
-
-        const manifest = await routerCore.getAgentManifest({ role: roleId });
         return {
           content: [
             {

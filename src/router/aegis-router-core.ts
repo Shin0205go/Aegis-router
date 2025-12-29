@@ -232,7 +232,8 @@ export class AegisRouterCore extends EventEmitter {
     // Update state and discover tools
     await this.updateConnectedServersState();
     await this.discoverAllTools();
-    this.updateVisibleTools();
+    // Note: Don't call updateVisibleTools() here - let getAgentManifest handle it
+    // because currentRole hasn't been updated yet
 
     // Set up the prompt router
     this.roleConfigManager.setPromptRouter(this.createPromptRouter());
