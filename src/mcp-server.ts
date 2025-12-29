@@ -13,13 +13,20 @@ import {
   GetPromptRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 
+import { dirname, join } from 'path';
+import { fileURLToPath } from 'url';
 import { Logger } from './utils/logger.js';
 import { AegisRouterCore, createAegisRouterCore } from './router/aegis-router-core.js';
+
+// Get the directory of this script (works with ES modules)
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const PROJECT_ROOT = join(__dirname, '..');
 
 const logger = new Logger('info');
 
 async function main() {
-  logger.info('Starting AEGIS Router MCP Server...');
+  logger.info('Starting AEGIS Router MCP Server...', { projectRoot: PROJECT_ROOT });
 
   // Create MCP Server
   const server = new Server(
@@ -35,25 +42,34 @@ async function main() {
     }
   );
 
-  // Initialize Router Core
-  const routerCore = createAegisRouterCore(logger);
+  // Initialize Router Core with explicit paths
+  const routerCore = createAegisRouterCore(logger, {
+    rolesDir: join(PROJECT_ROOT, 'roles'),
+  });
 
-  // Load server configuration from environment or config file
-  const configPath = process.env.AEGIS_CONFIG_PATH;
-  if (configPath) {
-    try {
-      const fs = await import('fs/promises');
-      const configContent = await fs.readFile(configPath, 'utf-8');
-      const config = JSON.parse(configContent);
+  // Load server configuration from environment or default config file
+  const configPath = process.env.AEGIS_CONFIG_PATH || join(PROJECT_ROOT, 'config.json');
+  logger.info(`Loading backend servers from: ${configPath}`);
 
-      if (config.mcpServers) {
-        for (const [name, serverConfig] of Object.entries(config.mcpServers)) {
-          await routerCore.addServer(name, serverConfig as any);
-        }
+  try {
+    const fs = await import('fs/promises');
+    const configContent = await fs.readFile(configPath, 'utf-8');
+    const config = JSON.parse(configContent);
+
+    if (config.mcpServers) {
+      for (const [name, serverConfig] of Object.entries(config.mcpServers)) {
+        logger.info(`Adding backend server: ${name}`);
+        await routerCore.addServer(name, serverConfig as any);
       }
-    } catch (error) {
-      logger.warn(`Failed to load config from ${configPath}:`, error);
+      logger.info(`Loaded ${Object.keys(config.mcpServers).length} backend server configurations`);
+
+      // Start all backend servers immediately (eager loading)
+      logger.info('Starting all backend servers...');
+      await routerCore.startServers();
+      logger.info('All backend servers started');
     }
+  } catch (error) {
+    logger.warn(`Failed to load config from ${configPath}:`, error);
   }
 
   // Initialize router
@@ -61,11 +77,9 @@ async function main() {
 
   // List Tools Handler
   server.setRequestHandler(ListToolsRequestSchema, async () => {
-    // Get tools from backend servers via router
-    const response = await routerCore.routeRequest({ method: 'tools/list' });
-    const backendTools = response?.tools || [];
+    logger.info('ListTools request received');
 
-    // Add the get_agent_manifest tool
+    // Add the get_agent_manifest tool (always available)
     const manifestTool = {
       name: 'get_agent_manifest',
       description: 'Switch agent role and get the manifest with available tools and system instruction',
@@ -81,8 +95,21 @@ async function main() {
       },
     };
 
+    // Get tools from backend servers via router
+    let backendTools: any[] = [];
+    try {
+      const response = await routerCore.routeRequest({ method: 'tools/list' });
+      backendTools = response?.result?.tools || response?.tools || [];
+      logger.info(`Got ${backendTools.length} tools from backend servers`);
+    } catch (error) {
+      logger.warn('Failed to get tools from backend servers:', error);
+    }
+
+    const allTools = [manifestTool, ...backendTools];
+    logger.info(`Returning ${allTools.length} total tools`);
+
     return {
-      tools: [manifestTool, ...backendTools],
+      tools: allTools,
     };
   });
 
@@ -106,6 +133,18 @@ async function main() {
       }
 
       try {
+        // Start required servers for this role (lazy loading)
+        logger.info(`Switching to role: ${roleId}, starting required servers...`);
+        await routerCore.startServersForRole(roleId);
+
+        // Notify client that tools have changed
+        try {
+          await server.sendToolListChanged();
+          logger.info('Sent tools/list_changed notification');
+        } catch (notifyError) {
+          logger.warn('Failed to send tools/list_changed notification:', notifyError);
+        }
+
         const manifest = await routerCore.getAgentManifest({ role: roleId });
         return {
           content: [
@@ -116,6 +155,7 @@ async function main() {
           ],
         };
       } catch (error: any) {
+        logger.error(`Failed to switch to role ${roleId}:`, error);
         return {
           content: [
             {

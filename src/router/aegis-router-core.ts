@@ -206,6 +206,41 @@ export class AegisRouterCore extends EventEmitter {
   }
 
   /**
+   * Start servers required for a specific role (lazy loading)
+   */
+  async startServersForRole(roleId: string): Promise<void> {
+    const role = this.roleConfigManager.getRole(roleId);
+    if (!role) {
+      this.logger.warn(`Role not found: ${roleId}`);
+      return;
+    }
+
+    // Get allowed servers for this role
+    const allowedServers = role.allowedServers;
+
+    // If wildcard, start all servers
+    if (allowedServers.includes('*')) {
+      this.logger.info(`Role ${roleId} allows all servers, starting all...`);
+      await this.startServers();
+      return;
+    }
+
+    // Start only the required servers
+    this.logger.info(`Starting servers for role ${roleId}: ${allowedServers.join(', ')}`);
+    await this.stdioRouter.startServersByName(allowedServers);
+
+    // Update state and discover tools
+    await this.updateConnectedServersState();
+    await this.discoverAllTools();
+    this.updateVisibleTools();
+
+    // Set up the prompt router
+    this.roleConfigManager.setPromptRouter(this.createPromptRouter());
+
+    this.logger.info(`Servers started for role ${roleId}`);
+  }
+
+  /**
    * Stop all servers
    */
   async stopServers(): Promise<void> {
@@ -631,9 +666,112 @@ export class AegisRouterCore extends EventEmitter {
     // Check tool access for tool calls
     if (method === 'tools/call' && params?.name) {
       this.checkToolAccess(params.name);
+
+      // Handle skill filtering for agent-skills tools
+      if (params.name === 'agent-skills__list_skills') {
+        return await this.handleListSkillsWithFiltering(request);
+      }
+      if (params.name === 'agent-skills__get_skill') {
+        return await this.handleGetSkillWithFiltering(request, params.arguments);
+      }
     }
 
     // Forward to upstream
+    return await this.stdioRouter.routeRequest(request);
+  }
+
+  /**
+   * Handle list_skills with skill filtering for current agent
+   */
+  private async handleListSkillsWithFiltering(request: any): Promise<any> {
+    // Forward to upstream first
+    const response = await this.stdioRouter.routeRequest(request);
+
+    // If no current role or not an agent, return unfiltered
+    const currentRoleId = this.state.currentRole?.id;
+    if (!currentRoleId || !this.roleConfigManager.isAgentRole(currentRoleId)) {
+      return response;
+    }
+
+    // Get allowed skills for current agent
+    const allowedSkills = this.roleConfigManager.getAllowedSkillsForAgent(currentRoleId);
+    if (!allowedSkills) {
+      // No filtering needed
+      return response;
+    }
+
+    // Filter the skills in the response
+    try {
+      const result = response?.result;
+      if (result?.content?.[0]?.text) {
+        const skills = JSON.parse(result.content[0].text);
+        if (Array.isArray(skills)) {
+          const filteredSkills = skills.filter((skill: any) =>
+            allowedSkills.includes(skill.name)
+          );
+
+          this.logger.debug(`Skill filtering applied`, {
+            agent: currentRoleId,
+            original: skills.length,
+            filtered: filteredSkills.length,
+            allowed: allowedSkills
+          });
+
+          // Return filtered response
+          return {
+            ...response,
+            result: {
+              ...result,
+              content: [{
+                type: 'text',
+                text: JSON.stringify(filteredSkills, null, 2)
+              }]
+            }
+          };
+        }
+      }
+    } catch (error) {
+      this.logger.warn('Failed to filter list_skills response:', error);
+    }
+
+    return response;
+  }
+
+  /**
+   * Handle get_skill with skill access validation for current agent
+   */
+  private async handleGetSkillWithFiltering(request: any, args: any): Promise<any> {
+    const skillName = args?.name;
+    if (!skillName) {
+      return await this.stdioRouter.routeRequest(request);
+    }
+
+    // If no current role or not an agent, allow all
+    const currentRoleId = this.state.currentRole?.id;
+    if (!currentRoleId || !this.roleConfigManager.isAgentRole(currentRoleId)) {
+      return await this.stdioRouter.routeRequest(request);
+    }
+
+    // Check if skill is allowed
+    if (!this.roleConfigManager.isSkillAllowedForAgent(currentRoleId, skillName)) {
+      this.logger.warn(`Skill access denied`, {
+        agent: currentRoleId,
+        skill: skillName
+      });
+
+      return {
+        result: {
+          content: [{
+            type: 'text',
+            text: `Error: Skill '${skillName}' is not available for the current agent. ` +
+                  `Use list_skills to see available skills.`
+          }],
+          isError: true
+        }
+      };
+    }
+
+    // Skill is allowed, forward the request
     return await this.stdioRouter.routeRequest(request);
   }
 
@@ -814,6 +952,8 @@ export class AegisRouterCore extends EventEmitter {
    */
   async routeToolCall(toolName: string, args: Record<string, unknown>): Promise<any> {
     const request = {
+      jsonrpc: '2.0' as const,
+      id: Date.now(),
       method: 'tools/call',
       params: {
         name: toolName,

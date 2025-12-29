@@ -1,12 +1,42 @@
 {
-  "version": "1.0.0",
+  "version": "2.0.0",
   "defaultRole": "default",
   "serverGroups": {
     "filesystem": ["filesystem"],
     "execution": ["execution-server"],
-    "development": ["filesystem", "execution-server"],
+    "development": ["filesystem", "execution-server", "agent-skills"],
+    "code-tools": ["agent-skills"],
     "all": ["*"]
   },
+  "agents": [
+    {
+      "id": "formatter",
+      "displayName": "Code Formatter",
+      "description": "コードの整形を行う",
+      "allowedServers": ["agent-skills", "filesystem"],
+      "allowedSkills": ["doc-coauthoring", "docx", "xlsx", "pptx"],
+      "toolPermissions": {
+        "allowPatterns": ["agent-skills__*", "filesystem__read*", "filesystem__write*"]
+      }
+    },
+    {
+      "id": "reviewer",
+      "displayName": "Code Reviewer",
+      "description": "コードの品質チェックを行う",
+      "allowedServers": ["agent-skills", "filesystem"],
+      "allowedSkills": ["mcp-builder", "skill-creator", "webapp-testing"],
+      "toolPermissions": {
+        "allowPatterns": ["agent-skills__*", "filesystem__read*"]
+      }
+    },
+    {
+      "id": "mentor",
+      "displayName": "Mentor",
+      "description": "コードを教えてくれるメンター",
+      "allowedServers": ["agent-skills", "filesystem"],
+      "allowedSkills": ["skill-creator", "mcp-builder", "frontend-design", "doc-coauthoring"]
+    }
+  ],
   "roles": [
     {
       "id": "default",

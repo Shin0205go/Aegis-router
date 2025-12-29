@@ -146,9 +146,8 @@ export class RoleConfigManager {
 
             this.logger.debug(`Loaded agent as role: ${role.id}`, {
               name: role.name,
-              sourceBackend: agentConfig.sourceBackend,
-              additionalBackends: agentConfig.additionalBackends?.length || 0,
-              servers: role.allowedServers.length
+              servers: role.allowedServers,
+              skills: agentConfig.allowedSkills
             });
           } catch (error) {
             this.logger.error(`Failed to load agent ${agentConfig.id}:`, error);
@@ -406,36 +405,19 @@ IMPORTANT: With great power comes great responsibility.
   /**
    * Convert an AgentConfig to a Role
    *
-   * This is the core of the Persona + Skills architecture:
-   * - AgentConfig defines persona (AEGIS personality) + backend references
-   * - Role defines which servers/tools are accessible
-   *
-   * The conversion:
-   * - allowedServers = [sourceBackend, ...additionalBackends]
-   * - remoteInstruction fetches SKILL.md from backend (if includeSkillInstruction)
-   * - systemInstruction starts with persona, skill instruction added on activation
+   * Agent = skill + access control
+   * - allowedServers: which MCP servers this agent can use
+   * - allowedSkills: which skills from agent-skills are visible
+   * - toolPermissions: fine-grained tool access control
    */
   private agentToRole(agent: AgentConfig): Role {
-    // Build allowed servers list from backend configuration
-    const allowedServers: string[] = [agent.sourceBackend];
-    if (agent.additionalBackends) {
-      allowedServers.push(...agent.additionalBackends);
+    const allowedServers = agent.allowedServers || [];
+    if (allowedServers.length === 0) {
+      this.logger.warn(`Agent ${agent.id} has no allowed servers configured`);
     }
 
-    // Build remote instruction config if skill instruction should be included
-    let remoteInstruction: RemoteInstruction | undefined;
-    if (agent.includeSkillInstruction !== false) {
-      remoteInstruction = {
-        backend: agent.sourceBackend,
-        promptName: agent.skillPromptName || 'default_instruction',
-        cacheTtl: 300, // 5 minutes default cache
-        fallback: agent.persona // Use persona as fallback if skill fetch fails
-      };
-    }
-
-    // System instruction starts with persona
-    // When role is activated, skill instruction is fetched and combined
-    const systemInstruction = agent.persona;
+    // Simple system instruction based on description
+    const systemInstruction = `# ${agent.displayName}\n\n${agent.description}`;
 
     const role: Role = {
       id: agent.id,
@@ -443,7 +425,6 @@ IMPORTANT: With great power comes great responsibility.
       description: agent.description,
       allowedServers,
       systemInstruction,
-      remoteInstruction,
       toolPermissions: agent.toolPermissions,
       metadata: {
         ...agent.metadata,
@@ -454,11 +435,40 @@ IMPORTANT: With great power comes great responsibility.
 
     this.logger.debug(`Converted agent to role: ${agent.id}`, {
       allowedServers,
-      hasRemoteInstruction: !!remoteInstruction,
-      personaLength: agent.persona.length
+      allowedSkills: agent.allowedSkills
     });
 
     return role;
+  }
+
+  /**
+   * Get allowed skills for an agent
+   * Returns undefined if no skill filtering (all skills allowed)
+   */
+  getAllowedSkillsForAgent(agentId: string): string[] | undefined {
+    const agent = this.agents.get(agentId);
+    if (!agent) return undefined;
+
+    // If allowedSkills is defined and non-empty, return it
+    if (agent.allowedSkills && agent.allowedSkills.length > 0) {
+      return agent.allowedSkills;
+    }
+
+    // No skill filtering
+    return undefined;
+  }
+
+  /**
+   * Check if a skill is allowed for an agent
+   */
+  isSkillAllowedForAgent(agentId: string, skillName: string): boolean {
+    const allowedSkills = this.getAllowedSkillsForAgent(agentId);
+
+    // If no skill filtering, all skills are allowed
+    if (!allowedSkills) return true;
+
+    // Check if skill is in allowed list
+    return allowedSkills.includes(skillName);
   }
 
   /**
@@ -472,13 +482,6 @@ IMPORTANT: With great power comes great responsibility.
   /**
    * Refresh a role's system instruction from remote source
    * Called when a role with remote instruction is activated
-   *
-   * For agent roles (Persona + Skills architecture):
-   * - Fetches SKILL.md from backend
-   * - Combines persona + skill instruction
-   *
-   * For legacy roles:
-   * - Just uses the fetched content as-is
    *
    * @param roleId - The role ID to refresh
    * @returns The updated system instruction, or null if no remote instruction
@@ -494,88 +497,19 @@ IMPORTANT: With great power comes great responsibility.
     const result = await this.remotePromptFetcher.fetchPrompt(role.remoteInstruction);
 
     if (result.success) {
-      let finalInstruction: string;
-
-      // Check if this is an agent role - if so, combine persona + skill
-      const agentConfig = this.agents.get(roleId);
-      if (agentConfig) {
-        // Persona + Skills combination
-        // Persona defines the personality, skill defines capabilities
-        finalInstruction = this.combinePersonaAndSkill(
-          agentConfig.persona,
-          result.content,
-          agentConfig
-        );
-
-        this.logger.debug(`Combined persona + skill for agent: ${roleId}`, {
-          personaLength: agentConfig.persona.length,
-          skillLength: result.content.length,
-          combinedLength: finalInstruction.length
-        });
-      } else {
-        // Legacy role - just use the fetched content
-        finalInstruction = result.content;
-      }
-
-      // Update the role's system instruction
-      role.systemInstruction = finalInstruction;
+      role.systemInstruction = result.content;
       this.roles.set(roleId, role);
 
       this.logger.info(`Remote instruction refreshed for ${roleId}`, {
         source: result.source,
-        isAgent: !!agentConfig,
-        contentLength: finalInstruction.length
+        contentLength: result.content.length
       });
 
-      return finalInstruction;
+      return result.content;
     } else {
       this.logger.warn(`Failed to refresh remote instruction for ${roleId}:`, result.error);
-
-      // Keep the current instruction (which might be fallback/persona)
       return role.systemInstruction;
     }
-  }
-
-  /**
-   * Combine persona and skill instructions for agent roles
-   *
-   * Structure:
-   * 1. Persona header (what the agent IS)
-   * 2. Skill instruction (what the agent CAN DO and HOW)
-   * 3. Any additional context
-   */
-  private combinePersonaAndSkill(
-    persona: string,
-    skillInstruction: string,
-    agent: AgentConfig
-  ): string {
-    const parts: string[] = [];
-
-    // Header
-    parts.push(`# ${agent.displayName}`);
-    parts.push('');
-
-    // Persona section
-    parts.push('## Persona');
-    parts.push('');
-    parts.push(persona);
-    parts.push('');
-
-    // Skill section
-    parts.push('## Capabilities');
-    parts.push('');
-    parts.push(skillInstruction);
-    parts.push('');
-
-    // Footer with metadata
-    parts.push('---');
-    parts.push(`Agent ID: ${agent.id}`);
-    parts.push(`Source Backend: ${agent.sourceBackend}`);
-    if (agent.additionalBackends && agent.additionalBackends.length > 0) {
-      parts.push(`Additional Backends: ${agent.additionalBackends.join(', ')}`);
-    }
-
-    return parts.join('\n');
   }
 
   /**

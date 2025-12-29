@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__aegis-router__filesystem__directory_tree",
+      "mcp__aegis-router__filesystem__list_directory",
+      "WebFetch(domain:docs.anthropic.com)",
+      "WebSearch",
+      "WebFetch(domain:www.datacamp.com)"
+    ]
+  }
+}

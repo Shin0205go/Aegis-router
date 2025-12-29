@@ -80,6 +80,39 @@ export class StdioRouter extends EventEmitter {
     await Promise.all(startPromises);
   }
 
+  /**
+   * 指定されたサーバーのみを起動（未起動の場合のみ）
+   */
+  async startServersByName(serverNames: string[]): Promise<void> {
+    const startPromises = serverNames.map(async (name) => {
+      const server = this.upstreamServers.get(name);
+      if (!server) {
+        this.logger.warn(`Server not configured: ${name}`);
+        return;
+      }
+      if (server.connected) {
+        this.logger.debug(`Server already connected: ${name}`);
+        return;
+      }
+      try {
+        this.logger.info(`Starting server: ${name}`);
+        await this.startServer(name, server);
+      } catch (error) {
+        this.logger.error(`Failed to start server ${name}:`, error);
+      }
+    });
+
+    await Promise.all(startPromises);
+  }
+
+  /**
+   * サーバーが接続済みかどうかを確認
+   */
+  isServerConnected(name: string): boolean {
+    const server = this.upstreamServers.get(name);
+    return server?.connected ?? false;
+  }
+
   private async startServer(name: string, server: UpstreamServerInfo): Promise<void> {
     return new Promise((resolve, reject) => {
       try {

@@ -166,15 +166,12 @@ export interface RemoteInstruction {
 // ============================================================================
 
 /**
- * Agent configuration - combines persona (AEGIS) with skills (backend)
+ * Agent configuration - skill-based agent definition
  *
  * Design philosophy:
- * - Client sees only "agent menu" from AEGIS
- * - Skill server provides tools and SKILL.md (what it can do + how)
- * - AEGIS adds the persona/"flavor" on top (personality + constraints)
- *
- * This allows the same skill server to be used by multiple agents
- * with different personalities (strict reviewer, kind teacher, etc.)
+ * - Agent = skill + access control
+ * - Skill provides instruction (SKILL.md) and tools
+ * - AEGIS controls which servers/skills/tools are accessible
  */
 export interface AgentConfig {
   /** Agent ID for internal reference */
@@ -186,39 +183,13 @@ export interface AgentConfig {
   /** Description of what this agent does */
   description: string;
 
-  /**
-   * Persona instruction - AEGIS's own personality definition
-   * This is the "flavor" added by AEGIS (e.g., "strict reviewer", "kind teacher")
-   *
-   * Example:
-   * "あなたは口うるさいシニアエンジニアです。必ず改善点を3つ指摘してください。"
-   */
-  persona: string;
+  /** Allowed backend servers for this agent */
+  allowedServers: string[];
 
-  /**
-   * Source backend server for skills and tools
-   * This server provides the SKILL.md and available tools
-   */
-  sourceBackend: string;
+  /** Allowed skills (filters list_skills/get_skill responses) */
+  allowedSkills?: string[];
 
-  /**
-   * Whether to include the skill instruction from the backend
-   * If true, fetches SKILL.md from the backend and combines with persona
-   * Default: true
-   */
-  includeSkillInstruction?: boolean;
-
-  /**
-   * Prompt name to fetch from backend (default: "default_instruction")
-   */
-  skillPromptName?: string;
-
-  /**
-   * Additional backends to mount (for multi-skill agents)
-   */
-  additionalBackends?: string[];
-
-  /** Tool permissions for this agent */
+  /** Tool permissions for fine-grained control */
   toolPermissions?: ToolPermissions;
 
   /** Agent metadata */
