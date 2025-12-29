@@ -807,6 +807,40 @@ export class AegisRouterCore extends EventEmitter {
 
     this.logger.info('Role configuration reloaded');
   }
+
+  /**
+   * Route a tool call to the appropriate backend server
+   * Convenience method for MCP server integration
+   */
+  async routeToolCall(toolName: string, args: Record<string, unknown>): Promise<any> {
+    const request = {
+      method: 'tools/call',
+      params: {
+        name: toolName,
+        arguments: args
+      }
+    };
+
+    const response = await this.routeRequest(request);
+    return response?.result ?? response;
+  }
+
+  /**
+   * Get the current router state for external access
+   */
+  getState(): {
+    currentRole: string | null;
+    systemInstruction: string | null;
+    visibleToolsCount: number;
+    connectedServersCount: number;
+  } {
+    return {
+      currentRole: this.state.currentRole?.id ?? null,
+      systemInstruction: this.state.currentRole?.systemInstruction ?? null,
+      visibleToolsCount: this.state.visibleTools.size,
+      connectedServersCount: this.state.connectedServers.size
+    };
+  }
 }
 
 // Export factory function
