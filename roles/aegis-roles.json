@@ -1,0 +1,138 @@
+{
+  "version": "1.0.0",
+  "defaultRole": "default",
+  "serverGroups": {
+    "filesystem": ["filesystem"],
+    "execution": ["execution-server"],
+    "development": ["filesystem", "execution-server"],
+    "all": ["*"]
+  },
+  "roles": [
+    {
+      "id": "default",
+      "name": "Default Role",
+      "description": "Full access to all servers and tools for unrestricted operation",
+      "allowedServers": ["*"],
+      "systemInstruction": "You have full access to all available tools and servers. Use them responsibly and follow best practices for security and data handling.",
+      "metadata": {
+        "priority": 0,
+        "active": true,
+        "tags": ["default", "full-access"]
+      }
+    },
+    {
+      "id": "frontend",
+      "name": "Frontend Developer",
+      "description": "Specialized role for frontend development with React, CSS, and UI work",
+      "allowedServers": ["filesystem"],
+      "systemInstruction": "You are a frontend developer specializing in React, CSS, and UI development. Focus on creating clean, accessible, and responsive user interfaces.",
+      "toolPermissions": {
+        "allowPatterns": [
+          "filesystem__read*",
+          "filesystem__write*",
+          "filesystem__list*",
+          "filesystem__search*"
+        ],
+        "denyPatterns": [
+          "*__delete*",
+          "*__execute*"
+        ]
+      },
+      "metadata": {
+        "priority": 10,
+        "active": true,
+        "tags": ["development", "frontend", "ui"]
+      }
+    },
+    {
+      "id": "backend",
+      "name": "Backend Developer",
+      "description": "Specialized role for backend development with API, database, and server-side work",
+      "allowedServers": ["@development"],
+      "systemInstruction": "You are a backend developer specializing in API design, database management, and server-side development. Focus on building scalable, secure, and efficient systems.",
+      "metadata": {
+        "priority": 10,
+        "active": true,
+        "tags": ["development", "backend", "api"]
+      }
+    },
+    {
+      "id": "db_admin",
+      "name": "Database Administrator",
+      "description": "Role for database administration with full database access but limited file system access",
+      "allowedServers": ["filesystem"],
+      "systemInstruction": "You are a database administrator with expertise in database design, optimization, and maintenance. You have read-only access to the filesystem for reviewing schemas and configurations.",
+      "toolPermissions": {
+        "allowPatterns": [
+          "filesystem__read*",
+          "filesystem__list*"
+        ],
+        "denyPatterns": [
+          "filesystem__write*",
+          "filesystem__delete*"
+        ]
+      },
+      "metadata": {
+        "priority": 15,
+        "active": true,
+        "tags": ["database", "admin", "restricted"]
+      }
+    },
+    {
+      "id": "security",
+      "name": "Security Analyst",
+      "description": "Role for security analysis with read-only access for code review and audit",
+      "allowedServers": ["filesystem"],
+      "systemInstruction": "You are a security analyst focused on code review, vulnerability assessment, and security auditing. You have read-only access to ensure you can analyze without modifying any files.",
+      "toolPermissions": {
+        "allowPatterns": [
+          "filesystem__read*",
+          "filesystem__list*",
+          "filesystem__search*"
+        ],
+        "deny": [],
+        "denyPatterns": [
+          "*__write*",
+          "*__delete*",
+          "*__execute*",
+          "*__create*"
+        ]
+      },
+      "metadata": {
+        "priority": 20,
+        "active": true,
+        "tags": ["security", "audit", "read-only"]
+      }
+    },
+    {
+      "id": "devops",
+      "name": "DevOps Engineer",
+      "description": "Role for DevOps with full access to deployment and infrastructure tools",
+      "allowedServers": ["@all"],
+      "systemInstruction": "You are a DevOps engineer with expertise in CI/CD, infrastructure automation, and deployment. You have full access to all tools for managing the development and production environments.",
+      "metadata": {
+        "priority": 25,
+        "active": true,
+        "tags": ["devops", "infrastructure", "deployment"]
+      }
+    },
+    {
+      "id": "guest",
+      "name": "Guest",
+      "description": "Restricted guest role with minimal read-only access",
+      "allowedServers": ["filesystem"],
+      "systemInstruction": "You are a guest with limited read-only access. You can only read files and list directories. Contact the administrator for elevated access.",
+      "toolPermissions": {
+        "allowPatterns": [
+          "filesystem__read_file",
+          "filesystem__list_directory"
+        ]
+      },
+      "metadata": {
+        "priority": -1,
+        "active": true,
+        "tags": ["guest", "read-only", "minimal"]
+      }
+    }
+  ]
+}

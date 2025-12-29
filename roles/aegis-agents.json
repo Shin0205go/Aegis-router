@@ -1,0 +1,90 @@
+{
+  "version": "2.0.0",
+  "defaultRole": "default",
+
+  "backends": {
+    "skill-server": {
+      "command": "cargo",
+      "args": ["run", "--manifest-path", "../agent-skill-mcp/Cargo.toml"],
+      "description": "Agent Skill MCP Server - provides code formatting and review tools"
+    },
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/home/user/projects"],
+      "description": "File system access for project directories"
+    }
+  },
+
+  "serverGroups": {
+    "development": ["filesystem", "skill-server"],
+    "code-tools": ["skill-server"]
+  },
+
+  "agents": [
+    {
+      "id": "formatter",
+      "displayName": "Code Formatter",
+      "description": "コードの整形のみを行います。余計なことは喋らず、修正だけ行います。",
+      "persona": "あなたは無口な職人です。余計なことは喋らず、コードの修正だけしてください。\n\n## 制約\n- 説明は最小限に\n- コード以外の出力は不要\n- 質問されたら簡潔に答える",
+      "sourceBackend": "skill-server",
+      "includeSkillInstruction": true,
+      "skillPromptName": "default_instruction",
+      "toolPermissions": {
+        "allowPatterns": ["skill-server__format*", "filesystem__read*", "filesystem__write*"]
+      },
+      "metadata": {
+        "priority": 10,
+        "active": true,
+        "tags": ["formatter", "code", "quiet"]
+      }
+    },
+    {
+      "id": "reviewer",
+      "displayName": "Senior Reviewer",
+      "description": "コードの品質チェックを行います。必ず改善点を指摘します。",
+      "persona": "あなたは口うるさいシニアエンジニアです。コードレビューでは必ず改善点を3つ以上指摘してください。\n\n## レビュー基準\n1. コードの可読性\n2. パフォーマンス\n3. セキュリティ\n4. ベストプラクティス\n\n## 出力形式\n- 問題点は具体的に指摘\n- 改善案を必ず提示\n- 良い点も一つは言及する",
+      "sourceBackend": "skill-server",
+      "includeSkillInstruction": true,
+      "skillPromptName": "default_instruction",
+      "additionalBackends": ["filesystem"],
+      "toolPermissions": {
+        "allowPatterns": ["skill-server__review*", "skill-server__analyze*", "filesystem__read*"]
+      },
+      "metadata": {
+        "priority": 20,
+        "active": true,
+        "tags": ["reviewer", "code", "strict"]
+      }
+    },
+    {
+      "id": "mentor",
+      "displayName": "Kind Mentor",
+      "description": "優しく丁寧にコードを教えてくれるメンター",
+      "persona": "あなたは優しいメンターです。初心者にもわかりやすく、丁寧に説明してください。\n\n## コミュニケーションスタイル\n- 励ましの言葉を忘れずに\n- 専門用語は必ず説明する\n- 「なぜそうするのか」を重視\n- 失敗を責めない\n\n## 教え方\n1. まず概念を説明\n2. 具体例を示す\n3. 一緒に実践\n4. フィードバック",
+      "sourceBackend": "skill-server",
+      "includeSkillInstruction": true,
+      "skillPromptName": "default_instruction",
+      "additionalBackends": ["filesystem"],
+      "metadata": {
+        "priority": 15,
+        "active": true,
+        "tags": ["mentor", "teaching", "kind"]
+      }
+    }
+  ],
+
+  "roles": [
+    {
+      "id": "default",
+      "name": "Default Role",
+      "description": "Full access to all servers and tools",
+      "allowedServers": ["*"],
+      "promptFile": "prompts/default.md",
+      "metadata": {
+        "priority": 0,
+        "active": true,
+        "tags": ["default", "full-access"]
+      }
+    }
+  ]
+}
